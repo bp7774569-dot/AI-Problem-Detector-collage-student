@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Problem Detector</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: Arial, sans-serif;
+      background: #f4f7fb; color: #172033;
+    }
+    .container { max-width: 1050px; margin: 0 auto; padding: 28px 18px; }
+    header { margin-bottom: 20px; }
+    h1 { margin: 0 0 6px; }
+    .subtitle { color: #667085; }
+    .security {
+      background: #fff8e1; border: 1px solid #f1d47a;
+      padding: 14px; border-radius: 10px; margin-bottom: 18px;
+    }
+    .tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+    .tab {
+      border: 0; padding: 11px 16px; border-radius: 8px;
+      cursor: pointer; background: #e7ebf2;
+    }
+    .tab.active { background: #2563eb; color: white; }
+    .panel {
+      background: white; border-radius: 12px; padding: 20px;
+      box-shadow: 0 3px 16px rgba(0,0,0,.07);
+    }
+    textarea {
+      width: 100%; min-height: 220px; resize: vertical;
+      padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px;
+      font-family: Consolas, monospace; font-size: 14px;
+    }
+    button.primary {
+      margin-top: 12px; padding: 11px 18px; border: 0;
+      border-radius: 8px; background: #2563eb; color: white;
+      cursor: pointer; font-weight: 600;
+    }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    .result { margin-top: 18px; }
+    .msg { padding: 12px; border-radius: 8px; margin: 8px 0; }
+    .success { background: #e9f8ef; color: #176b3a; }
+    .error { background: #fdecec; color: #a51d2d; }
+    .info { background: #eef5ff; color: #1e4f91; }
+    .finding {
+      border: 1px solid #ddd; border-left: 5px solid #ef4444;
+      padding: 12px; border-radius: 8px; margin: 10px 0;
+    }
+    .finding strong { display: block; margin-bottom: 5px; }
+    .hidden { display: none; }
+    footer { color: #667085; margin-top: 20px; font-size: 13px; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>🛡️ AI Problem Detector</h1>
+    <div class="subtitle">Micro Project • Secure problem & code analysis tool</div>
+  </header>
+
+  <div class="security">
+    <strong>Security</strong><br>
+    No eval()/exec() is used by this application. Input is limited to 12,000 characters.
+    Do not paste real passwords, API keys, tokens, or private data.
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="problemTab">🔎 Problem Detector</button>
+    <button class="tab" data-tab="codeTab">🧑‍💻 Security Code Scanner</button>
+  </div>
+
+  <section id="problemTab" class="panel">
+    <h2>Describe your problem</h2>
+    <textarea id="problem" maxlength="12000"
+      placeholder="Example: Login API returns 500 error when password contains special characters..."></textarea>
+    <button class="primary" id="analyzeBtn">Analyze Problem</button>
+    <div id="problemResult" class="result"></div>
+  </section>
+
+  <section id="codeTab" class="panel hidden">
+    <h2>Secure Code Scanner</h2>
+    <textarea id="code" maxlength="12000" style="min-height:320px"
+      placeholder="Paste Python, Java, JavaScript, PHP, SQL, configuration, etc."></textarea>
+    <button class="primary" id="scanBtn">Scan Code</button>
+    <div id="codeResult" class="result"></div>
+  </section>
+
+  <footer>AI Problem Detector • Vercel deployment version</footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+document.querySelectorAll(".tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    document.querySelectorAll(".panel").forEach(p => p.classList.add("hidden"));
+    $(tab.dataset.tab).classList.remove("hidden");
+  });
+});
+
+function showMessage(el, type, text) {
+  el.innerHTML = `<div class="msg ${type}">${text}</div>`;
+}
+
+$("analyzeBtn").addEventListener("click", async () => {
+  const problem = $("problem").value.trim();
+  const result = $("problemResult");
+
+  if (!problem) {
+    showMessage(result, "error", "Please enter a problem.");
+    return;
+  }
+
+  showMessage(result, "info", "Analyzing...");
+  try {
+    const response = await fetch("/api/analyze", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({problem})
+    });
+    const data = await response.json();
+
+    if (!response.ok) throw new Error(data.error || "Request failed");
+
+    let html = `<div class="msg success"><strong>Analysis completed.</strong>
+      Detected category: ${data.categories.join(", ")}</div>`;
+
+    if (data.categories.includes("Security"))
+      html += `<div class="msg error">Security-related content detected. Avoid sharing real credentials or secrets.</div>`;
+    if (data.categories.includes("Software/Error"))
+      html += `<div class="msg info">Check stack traces, input validation, exception handling, and recent code changes.</div>`;
+    if (data.categories.includes("Performance"))
+      html += `<div class="msg info">Check slow queries, network latency, loops, resource usage, and timeouts.</div>`;
+    if (data.categories.includes("Database"))
+      html += `<div class="msg info">Check query parameters, indexes, connection handling, and input validation.</div>`;
+    if (data.categories.includes("Network"))
+      html += `<div class="msg info">Check DNS, connectivity, TLS/HTTPS, ports, and service availability.</div>`;
+
+    result.innerHTML = html;
+  } catch (e) {
+    showMessage(result, "error", e.message);
+  }
+});
+
+$("scanBtn").addEventListener("click", async () => {
+  const code = $("code").value.trim();
+  const result = $("codeResult");
+
+  if (!code) {
+    showMessage(result, "error", "Please enter code.");
+    return;
+  }
+
+  showMessage(result, "info", "Scanning...");
+  try {
+    const response = await fetch("/api/scan", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({code})
+    });
+    const data = await response.json();
+
+    if (!response.ok) throw new Error(data.error || "Request failed");
+
+    if (!data.findings.length) {
+      result.innerHTML = `<div class="msg success">No known patterns detected by the built-in security rules.</div>
+      <div class="msg info">This does not prove the code is secure; manual review and dedicated SAST tools are still recommended.</div>`;
+      return;
+    }
+
+    result.innerHTML = `<div class="msg error">${data.findings.length} potential issue(s) detected.</div>` +
+      data.findings.map(f => `
+        <div class="finding">
+          <strong>${f.severity} • Line ${f.line} • ${f.title}</strong>
+          Recommended fix: ${f.fix}
+        </div>
+      `).join("");
+  } catch (e) {
+    showMessage(result, "error", e.message);
+  }
+});
+</script>
+</body>
+</html>
